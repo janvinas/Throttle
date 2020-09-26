@@ -1,0 +1,14 @@
+name: Throttle
+version: 1.0
+author: janitus1234
+description: Throttle plugin for traincarts
+main: com.janvinas.throttle.Main
+api-version: 1.13
+depend: [Train_Carts]
+commands:
+  throttle:
+    description: Throttle main command
+    usage: /throttle <2-8 | off>
+    aliases: th
+    permission: throttle.use
+    permission-message: You need the throttle.use permission to use this command.
