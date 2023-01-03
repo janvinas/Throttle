@@ -1,7 +1,7 @@
 package com.janvinas.throttle;
 
 import com.bergerkiller.bukkit.tc.controller.MinecartGroup;
-import com.bergerkiller.bukkit.tc.controller.components.SpeedAheadWaiter;
+import com.bergerkiller.bukkit.tc.controller.components.ObstacleTracker;
 import com.bergerkiller.bukkit.tc.properties.CartProperties;
 import com.bergerkiller.bukkit.tc.properties.TrainProperties;
 import org.bukkit.Bukkit;
@@ -14,20 +14,20 @@ import org.bukkit.scheduler.BukkitScheduler;
 import org.bukkit.boss.*;
 
 import java.util.HashMap;
+import java.util.List;
 
 public class Main extends JavaPlugin{
 
-    Float accelerationPerIncrement = 0.001F;    //acceleration per throttle increment in blocks/tick^2
     Integer maxSearchDistance = 300;
 
     //stores acceleration only for players that have executed the command
-    HashMap<Player, Integer> acceleration = new HashMap<Player, Integer>();
+    HashMap<Player, Integer> acceleration = new HashMap<>();
     //stores speed calculated every tick from acceleration and previous speed
-    HashMap<Player, Float> speed = new HashMap<Player, Float>();
+    HashMap<Player, Float> speed = new HashMap<>();
     //stores a bossbar for every player that has throttle turned on
-    HashMap<Player, BossBar> speedBar = new HashMap<Player, BossBar>();
+    HashMap<Player, BossBar> speedBar = new HashMap<>();
     //stores another bossbar to show distance from train ahead
-    HashMap<Player, BossBar> distanceBar = new HashMap<Player, BossBar>();
+    HashMap<Player, BossBar> distanceBar = new HashMap<>();
 
     @Override
     public void onEnable(){
@@ -49,10 +49,20 @@ public class Main extends JavaPlugin{
                         TrainProperties prop = cprop.getTrainProperties();
                         //save current speed in a variable to make working with it easier
                         float currentSpeed = speed.get(p);
+
+                        float maxspeed = 1;
+                        float accelerationPerIncrement = 0.001F;    //acceleration per throttle increment in blocks/tick^2
+                        for(String tag : prop.getTags()) {
+                            if (tag.matches("T[0-9]*\\.*[0-9]+\\|[0-9]*\\.*[0-9]+")) {
+                                maxspeed = Float.parseFloat(tag.substring(1, tag.indexOf("|")));
+                                accelerationPerIncrement = Float.parseFloat(tag.substring(tag.indexOf("|") + 1));
+                            }
+                        }
+
                         //update speed according to current acceleration and acceleration per throttle increment
                         currentSpeed += (acceleration.get(p) * accelerationPerIncrement);
                         //make sure speed is between 0 and 1
-                        if(currentSpeed > 1) currentSpeed = 1;
+                        if(currentSpeed > maxspeed) currentSpeed = maxspeed;
                         if(currentSpeed < 0) currentSpeed = 0;
                         //update speed limit of the train
                         prop.setSpeedLimit(currentSpeed);
@@ -139,7 +149,7 @@ public class Main extends JavaPlugin{
                     speedBar.put((Player) sender, Bukkit.createBossBar("Speed", BarColor.YELLOW, BarStyle.SEGMENTED_10));
                     speedBar.get((Player) sender).addPlayer((Player) sender);
 
-                    distanceBar.put((Player) sender, Bukkit.createBossBar("Obstacle ahead: ? blocks", BarColor.RED, BarStyle.SOLID));
+                    distanceBar.put((Player) sender, Bukkit.createBossBar("Train ahead: ? blocks", BarColor.RED, BarStyle.SOLID));
                     distanceBar.get((Player) sender).addPlayer((Player) sender);
                 }
                 float currentSpeed = speed.get((Player) sender);
@@ -157,9 +167,11 @@ public class Main extends JavaPlugin{
 
     public double getDistanceAhead(Player p, int d){
         MinecartGroup group = CartProperties.getEditing(p).getGroup();
-        if(group.findObstacleAhead(d) == null) return 0;
-        if(group.findObstacleAhead(d).distance > maxSearchDistance) return 0;
-        return group.findObstacleAhead(d).distance;
+        List<ObstacleTracker.Obstacle> obstacles = group.findObstaclesAhead(d,true, false);
+
+        if(obstacles.size() == 0) return 0;
+        if(obstacles.get(0).distance > d) return 0;
+        return obstacles.get(0).distance;
     }
 
 }
